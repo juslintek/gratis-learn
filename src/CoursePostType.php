@@ -117,13 +117,13 @@ final class CoursePostType {
         ]);
     }
 
-    /** Render a course outline with the current user's completion state. */
+    /** Render a course outline, or a course catalog when no course ID is active. */
     public static function shortcode($atts): string {
-        $atts = shortcode_atts(['id' => 0], $atts, 'gratis_course');
+        $atts      = shortcode_atts(['id' => 0], $atts, 'gratis_course');
         $course_id = absint($atts['id']) ?: get_the_ID();
 
         if (!$course_id || self::COURSE_TYPE !== get_post_type($course_id)) {
-            return '';
+            return self::renderCatalog();
         }
 
         $lessons = self::lessonsFor($course_id);
@@ -148,6 +148,57 @@ final class CoursePostType {
             $out .= '</li>';
         }
         $out .= '</ol>';
+
+        return $out;
+    }
+
+    /** Render a grid of all published courses with lesson counts and outlines. */
+    private static function renderCatalog(): string {
+        // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page -- bounded course catalog.
+        $courses = get_posts([
+            'post_type'      => self::COURSE_TYPE,
+            'post_status'    => 'publish',
+            'posts_per_page' => 50,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        ]);
+
+        if (empty($courses)) {
+            return '<p class="gratis-course-empty">' . esc_html__('No courses published yet.', 'gratis-learn') . '</p>';
+        }
+
+        $out = '<div class="gratis-course-catalog">';
+        foreach ($courses as $course) {
+            $lessons = self::lessonsFor($course->ID);
+            $count   = count($lessons);
+            $summary = '' !== trim((string) $course->post_excerpt)
+                ? wp_strip_all_tags((string) $course->post_excerpt)
+                : wp_trim_words(wp_strip_all_tags((string) $course->post_content), 24);
+
+            $out .= '<article class="gratis-course-card">';
+            $out .= '<div class="gratis-course-card__head">';
+            $out .= '<h3 class="gratis-course-card__title"><a href="' . esc_url((string) get_permalink($course->ID)) . '">' . esc_html($course->post_title) . '</a></h3>';
+            $out .= '<span class="gratis-course-card__count">' . esc_html(
+                sprintf(
+                    /* translators: %d: number of lessons. */
+                    _n('%d lesson', '%d lessons', $count, 'gratis-learn'),
+                    $count
+                )
+            ) . '</span>';
+            $out .= '</div>';
+            if ('' !== trim($summary)) {
+                $out .= '<p class="gratis-course-card__desc">' . esc_html($summary) . '</p>';
+            }
+            if (!empty($lessons)) {
+                $out .= '<ol class="gratis-course-outline">';
+                foreach (array_slice($lessons, 0, 5) as $lesson) {
+                    $out .= '<li class="gratis-lesson"><a href="' . esc_url((string) get_permalink($lesson->ID)) . '">' . esc_html($lesson->post_title) . '</a></li>';
+                }
+                $out .= '</ol>';
+            }
+            $out .= '</article>';
+        }
+        $out .= '</div>';
 
         return $out;
     }
