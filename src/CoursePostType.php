@@ -46,7 +46,7 @@ final class CoursePostType {
             'labels'       => ['name' => __('Quizzes', 'gratis-learn')],
             'public'       => false,
             'show_ui'      => true,
-            'show_in_rest' => true,
+            'show_in_rest' => false,
             'show_in_menu' => 'edit.php?post_type=' . self::COURSE_TYPE,
             'supports'     => ['title', 'editor', 'custom-fields'],
         ]);
@@ -82,7 +82,7 @@ final class CoursePostType {
         $user_id   = get_current_user_id();
         $lesson_id = (int) $req['lesson_id'];
 
-        if (self::LESSON_TYPE !== get_post_type($lesson_id)) {
+        if (self::LESSON_TYPE !== get_post_type($lesson_id) || 'publish' !== get_post_status($lesson_id)) {
             return new \WP_REST_Response(['error' => __('Unknown lesson.', 'gratis-learn')], 404);
         }
 
